@@ -70,6 +70,7 @@ struct ContentView: View {
     @State private var tideData: TideData?
     @State private var showingLocationPicker = false
     @State private var searchResults: [Location] = []
+    @AppStorage("savedLocation") private var savedLocationData: Data?
     
     private let apiKey = "986c3e50-ab46-4a33-acff-9366bf4c6c2b"
     
@@ -111,115 +112,137 @@ struct ContentView: View {
         }.resume()
     }
     
+    private func saveLocation(_ location: Location) {
+        if let encoded = try? JSONEncoder().encode(location) {
+            savedLocationData = encoded
+        }
+    }
+    
+    private func loadSavedLocation() {
+        guard let savedData = savedLocationData,
+              let location = try? JSONDecoder().decode(Location.self, from: savedData) else { return }
+        
+        selectedLocation = location
+        fetchTideData(for: location)
+    }
+    
     var body: some View {
-        VStack(spacing: 24) {
-            // Location Search Bar
-            HStack {
-                TextField("Search location", text: $searchText)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .onChange(of: searchText) { _ in
-                        searchLocations()
-                    }
-                
-                Button(action: {
-                    showingLocationPicker.toggle()
-                }) {
-                    Image(systemName: "location.magnifyingglass")
-                        .font(.title2)
-                        .foregroundColor(.blue)
-                }
-                .frame(width: 44, height: 44)
-            }
-            .padding(.horizontal)
-            
-            if showingLocationPicker {
-                List(searchResults) { location in
-                    Button(action: {
-                        selectedLocation = location
-                        fetchTideData(for: location)
-                        showingLocationPicker = false
-                    }) {
-                        Text(location.name)
-                    }
-                }
-                .frame(height: 200)
-            }
-            
-            if let tideData = tideData {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Location Header
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Location Search Bar
                     HStack {
-                        Image(systemName: "location.fill")
-                            .foregroundColor(.blue)
-                        Text(selectedLocation?.name ?? "Select Location")
-                            .font(.title2)
-                            .fontWeight(.semibold)
+                        TextField("Search location", text: $searchText)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .onChange(of: searchText) { _ in
+                                searchLocations()
+                            }
+                        
+                        Button(action: {
+                            showingLocationPicker.toggle()
+                        }) {
+                            Image(systemName: "location.magnifyingglass")
+                                .font(.title2)
+                                .foregroundColor(.blue)
+                        }
+                        .frame(width: 44, height: 44)
                     }
                     .padding(.horizontal)
                     
-                    // Tide Graph
-                    Chart {
-                        ForEach(tideData.heights, id: \.dt) { height in
-                            LineMark(
-                                x: .value("Time", Date(timeIntervalSince1970: TimeInterval(height.dt))),
-                                y: .value("Height", height.height)
-                            )
-                            .foregroundStyle(.blue.opacity(0.8))
+                    if showingLocationPicker {
+                        List(searchResults) { location in
+                            Button(action: {
+                                selectedLocation = location
+                                saveLocation(location)
+                                fetchTideData(for: location)
+                                showingLocationPicker = false
+                            }) {
+                                Text(location.name)
+                            }
                         }
-                        
-                        ForEach(tideData.extremes, id: \.dt) { extreme in
-                            PointMark(
-                                x: .value("Time", Date(timeIntervalSince1970: TimeInterval(extreme.dt))),
-                                y: .value("Height", extreme.height)
-                            )
-                            .foregroundStyle(extreme.type == "high" ? .red : .green)
-                        }
+                        .frame(height: 200)
                     }
-                    .chartXAxis {
-                        AxisMarks(values: .stride(by: .hour, count: 4)) { value in
-                            AxisGridLine()
-                            AxisValueLabel(format: .dateTime.hour())
-                        }
-                    }
-                    .frame(height: 250)
-                    .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(16)
-                    .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
                     
-                    // Highs and Lows Table
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Tide Extremes")
-                            .font(.headline)
+                    if let tideData = tideData {
+                        VStack(alignment: .leading, spacing: 16) {
+                            // Location Header
+                            HStack {
+                                Image(systemName: "location.fill")
+                                    .foregroundColor(.blue)
+                                Text(selectedLocation?.name ?? "Select Location")
+                                    .font(.title2)
+                                    .fontWeight(.semibold)
+                            }
                             .padding(.horizontal)
-                        
-                        ForEach(tideData.extremes, id: \.dt) { extreme in
-                            TideExtremeRow(extreme: extreme)
-                                .padding(.horizontal)
+                            
+                            // Tide Graph
+                            Chart {
+                                ForEach(tideData.heights, id: \.dt) { height in
+                                    LineMark(
+                                        x: .value("Time", Date(timeIntervalSince1970: TimeInterval(height.dt))),
+                                        y: .value("Height", height.height)
+                                    )
+                                    .foregroundStyle(.blue.opacity(0.8))
+                                }
+                                
+                                ForEach(tideData.extremes, id: \.dt) { extreme in
+                                    PointMark(
+                                        x: .value("Time", Date(timeIntervalSince1970: TimeInterval(extreme.dt))),
+                                        y: .value("Height", extreme.height)
+                                    )
+                                    .foregroundStyle(extreme.type == "high" ? .red : .green)
+                                }
+                            }
+                            .chartXAxis {
+                                AxisMarks(values: .stride(by: .hour, count: 4)) { value in
+                                    AxisGridLine()
+                                    AxisValueLabel(format: .dateTime.hour())
+                                }
+                            }
+                            .frame(height: 250)
+                            .padding()
+                            .background(Color(.systemBackground))
+                            .cornerRadius(16)
+                            .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+                            
+                            // Highs and Lows Table
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Tide Extremes")
+                                    .font(.headline)
+                                    .padding(.horizontal)
+                                
+                                ForEach(tideData.extremes, id: \.dt) { extreme in
+                                    TideExtremeRow(extreme: extreme)
+                                        .padding(.horizontal)
+                                }
+                            }
+                            .padding(.vertical)
+                            .background(Color(.systemBackground))
+                            .cornerRadius(16)
+                            .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
                         }
+                        .padding(.horizontal)
+                    } else {
+                        VStack(spacing: 16) {
+                            Image(systemName: "water.waves")
+                                .font(.system(size: 60))
+                                .foregroundColor(.blue.opacity(0.5))
+                            Text("Select a location to view tide data")
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding()
                     }
-                    .padding(.vertical)
-                    .background(Color(.systemBackground))
-                    .cornerRadius(16)
-                    .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
                 }
-                .padding(.horizontal)
-            } else {
-                VStack(spacing: 16) {
-                    Image(systemName: "water.waves")
-                        .font(.system(size: 60))
-                        .foregroundColor(.blue.opacity(0.5))
-                    Text("Select a location to view tide data")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding()
+                .padding(.vertical)
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("Tide Times")
+            .onAppear {
+                loadSavedLocation()
             }
         }
-        .padding(.vertical)
-        .background(Color(.systemGroupedBackground))
-        .navigationTitle("Tide Times")
     }
 }
 
