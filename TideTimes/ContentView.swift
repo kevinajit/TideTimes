@@ -70,7 +70,6 @@ struct ContentView: View {
     @State private var tideData: TideData?
     @State private var showingLocationPicker = false
     @State private var searchResults: [Location] = []
-    @AppStorage("savedLocation") private var savedLocationData: Data?
     
     private let apiKey = "986c3e50-ab46-4a33-acff-9366bf4c6c2b"
     
@@ -112,20 +111,6 @@ struct ContentView: View {
         }.resume()
     }
     
-    private func saveLocation(_ location: Location) {
-        if let encoded = try? JSONEncoder().encode(location) {
-            savedLocationData = encoded
-        }
-    }
-    
-    private func loadSavedLocation() {
-        guard let savedData = savedLocationData,
-              let location = try? JSONDecoder().decode(Location.self, from: savedData) else { return }
-        
-        selectedLocation = location
-        fetchTideData(for: location)
-    }
-    
     var body: some View {
         NavigationView {
             ScrollView {
@@ -153,7 +138,6 @@ struct ContentView: View {
                         List(searchResults) { location in
                             Button(action: {
                                 selectedLocation = location
-                                saveLocation(location)
                                 fetchTideData(for: location)
                                 showingLocationPicker = false
                             }) {
@@ -239,9 +223,6 @@ struct ContentView: View {
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Tide Times")
-            .onAppear {
-                loadSavedLocation()
-            }
         }
     }
 }
