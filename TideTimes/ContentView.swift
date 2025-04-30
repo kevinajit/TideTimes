@@ -8,6 +8,8 @@
 import SwiftUI
 import MapKit
 import Charts
+import Portal
+
 
 struct TideData: Codable {
     let status: Int
@@ -208,7 +210,7 @@ struct ContentView: View {
                         .padding(.horizontal)
                     } else {
                         VStack(spacing: 16) {
-                            Image(systemName: "water.waves")
+                            Image(systemName: "figure.pool.swim")
                                 .font(.system(size: 60))
                                 .foregroundColor(.blue.opacity(0.5))
                             Text("Select a location to view tide data")
